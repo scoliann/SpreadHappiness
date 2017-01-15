@@ -1,0 +1,4 @@
+14,44 * * * * /home/ubuntu/spreadHappinessFiles/setup.sh
+15,45 * * * * /usr/bin/python /home/ubuntu/spreadHappinessFiles/sendWarmFuzzies_3.py
+25,55 * * * * /home/ubuntu/spreadHappinessFiles/cleanup.sh
+
