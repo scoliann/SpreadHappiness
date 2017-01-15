@@ -3,19 +3,14 @@ import tweepy
 import json
 import os
 
-
-def setup():
-
-	# Create sadPeople folder if it does not already exist
-	if not os.path.isdir('sadPeople'):
-		os.makedirs('sadPeople')
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
 
 def readParameters(parameterKey):
 
 	# Scan through file to find parameterKey
 	parameterKeyCounter = 0
-	with open('parameters.txt', "r") as ifile:
+	with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'parameters.txt'), "r") as ifile:
 		for line in ifile:
 			line = line.rstrip().split('\t')
 
@@ -42,9 +37,10 @@ class StdOutListener(tweepy.StreamListener):
 	''' Handles data received from the stream. '''
 
 	# The constructor
-	def __init__(self, numTweets):
+	def __init__(self, numTweets, sid):
 		self.sadPeople = []
 		self.numTweets = int(numTweets)
+		self.sid = sid
  
 	# When a tweet occurs
     	def on_data(self, data):
@@ -54,10 +50,11 @@ class StdOutListener(tweepy.StreamListener):
 
 		# Get username and text of tweet
 		username = tweetDecoded['user']['screen_name'].encode('ascii', 'ignore')
-		tweetText = tweetDecoded['text'].encode('ascii', 'ignore').lower().split()
+		originalTweetText = tweetDecoded['text'].encode('ascii', 'ignore')
+		tweetText = originalTweetText.lower().split()
 		tweetId = str(tweetDecoded['id'])
 		
-		# Check for indicators of a bad day
+		# Check for the consecutive words "bad day"
 		badDay = False
 		for i in range(0,len(tweetText)-1):
     			if (tweetText[i] == 'bad') and (tweetText[i+1] == 'day'):
@@ -69,17 +66,21 @@ class StdOutListener(tweepy.StreamListener):
 			# Make sure tweet is not a Re-Tweet
 			if 'rt' not in tweetText:
 
-				# Create the CSV data
-				tweetText = ' '.join(tweetText)
-				sadPersonCSVData = username + ',' + tweetId + ',' + tweetText
+				# Check that the tweet has negative sentiment
+				sentimentScores = self.sid.polarity_scores(originalTweetText)
+				if sentimentScores['compound'] < 0.0:
 
-				# Print tweet found
-				print tweetText + '\n'
+					# Create the CSV data
+					tweetText = ' '.join(tweetText)
+					sadPersonCSVData = username + ',' + tweetId + ',' + originalTweetText
 
-				# Add CSV data and return if necessary
-				self.sadPeople.append(sadPersonCSVData)
-				if len(self.sadPeople) == self.numTweets:
-					return False
+					# Print tweet found
+					print tweetText + '\n'
+
+					# Add CSV data and return if necessary
+					self.sadPeople.append(sadPersonCSVData)
+					if len(self.sadPeople) == self.numTweets:
+						return False
 				
     	def on_error(self, status_code):
         	print('Got an error with status code: ' + str(status_code))
@@ -103,42 +104,20 @@ def getSadPeople(numTweets):
 	auth.set_access_token(accessToken, accessTokenSecret)
 
 	# Create a listener and begin streaming tweets
-	listener = StdOutListener(numTweets)
+	sid = SentimentIntensityAnalyzer()
+	listener = StdOutListener(numTweets, sid)
 	stream = tweepy.Stream(auth, listener)
-	stream.filter(track=['bad day'], languages=['en'])
+	stream.filter(track=['bad day i'], languages=['en'])
 
 	# Return values
 	return listener.sadPeople
 
 
-def recordResults(sadPeopleList, outputFile): 
-
-	# Setup sadPeople folder
-	setup()
-
-	# Save data to file
-	text_file = open('sadPeople/' + outputFile, "a")
-	for person in sadPeopleList:
-		text_file.write(person + '\n')
-	text_file.close()
-
-
 if __name__ == '__main__':
 
-	# Get command line arguments
-	outputFile = sys.argv[1]
-	numTweets = sys.argv[2]
-
 	# Create a list of sad people
+	numTweets = 5
 	sadPeopleList = getSadPeople(numTweets)
-
-	# Write results to CSV file
-	recordResults(sadPeopleList, outputFile)
-
-	
-
-
-
 
 
 
